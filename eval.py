@@ -56,24 +56,39 @@ def main():
 				netG.eval()
 
 				val_bar = tqdm(val_loader)
-				cache = {'ssim': 0, 'psnr': 0}
+				cache = {'ssim': 0, 'psnr': 0, 'inference_times': []}
 				dev_images = []
 				for val_lr, val_hr_restore, val_hr in val_bar:
 					batch_size = val_lr.size(0)
 
 					lr = Variable(val_lr)
 					hr = Variable(val_hr)
+					hr_restore = Variable(val_hr_restore)
 					if torch.cuda.is_available():
 						lr = lr.cuda()
 						hr = hr.cuda()
+						hr_restore = hr_restore.cuda()
 						
 					netG.load_state_dict(torch.load('cp/netG_epoch_'+ str(epoch) +'_gpu.pth', weights_only=True))	
+					
+					start_time = time.time()
 					sr = netG(lr)
+					torch.cuda.synchronize()
+					end_time = time.time()
+					inference_time = end_time - start_time
+					cache['inference_times'].append(inference_time)
 
 					psnr = 10 * log10(1 / ((sr - hr) ** 2).mean().item())
 					ssim = pytorch_ssim.ssim(sr, hr).item()
+
+					psnr_bicubic = 10 * log10(1 / ((hr_restore - hr) ** 2).mean().item())
+					ssim_bicubic = pytorch_ssim.ssim(hr_restore, hr).item()
+
 					val_bar.set_description(desc='[converting LR images to SR images] PSNR: %.4f dB SSIM: %.4f' % (psnr, ssim))
-				
+					val_bar.set_description(
+        				desc='[SR] PSNR: %.4f dB SSIM: %.4f | [Bicubic] PSNR: %.4f dB SSIM: %.4f' 
+        				% (psnr, ssim, psnr_bicubic, ssim_bicubic))
+					
 					cache['ssim'] += ssim
 					cache['psnr'] += psnr
 					
@@ -83,7 +98,12 @@ def main():
 					# Avoid out of memory crash on 8G GPU
 					if len(dev_images) < 80 :
 						dev_images.extend([to_image()(val_hr_restore.squeeze(0)), to_image()(hr.data.cpu().squeeze(0)), to_image()(sr.data.cpu().squeeze(0)), to_image()(sr_baseline.data.cpu().squeeze(0))])
-			
+
+
+				avg_time = sum(cache['inference_times']) / len(cache['inference_times'])
+				print(f"\nAverage inference time per image: {avg_time:.4f} seconds")
+				print(f"FPS: {1.0/avg_time:.2f}")
+
 				dev_images = torch.stack(dev_images)
 				dev_images = torch.chunk(dev_images, dev_images.size(0) // 4)
 
