@@ -39,7 +39,7 @@ def main():
 	val_loader = DataLoader(dataset=val_set, num_workers=1, batch_size=1, shuffle=False)
 	
 	now = time.gmtime(time.time())
-	#configure(str(now.tm_mon) + '-' + str(now.tm_mday) + '-' + str(now.tm_hour) + '-' + str(now.tm_min), flush_secs=5)
+	configure(str(now.tm_mon) + '-' + str(now.tm_mday) + '-' + str(now.tm_hour) + '-' + str(now.tm_min), flush_secs=5)
         
 	netG = Generator()
 
@@ -67,17 +67,17 @@ def main():
 						lr = lr.cuda()
 						hr = hr.cuda()
 						
-					netG.load_state_dict(torch.load('cp/netG_epoch_'+ str(epoch) +'_gpu.pth'))	
+					netG.load_state_dict(torch.load('cp/netG_epoch_'+ str(epoch) +'_gpu.pth', weights_only=True))	
 					sr = netG(lr)
 
-					#psnr = 10 * log10(1 / ((sr - hr) ** 2).mean().item())
-					#ssim = pytorch_ssim.ssim(sr, hr).item()
-					#val_bar.set_description(desc='[converting LR images to SR images] PSNR: %.4f dB SSIM: %.4f' % (psnr, ssim))
+					psnr = 10 * log10(1 / ((sr - hr) ** 2).mean().item())
+					ssim = pytorch_ssim.ssim(sr, hr).item()
+					val_bar.set_description(desc='[converting LR images to SR images] PSNR: %.4f dB SSIM: %.4f' % (psnr, ssim))
 				
-					#cache['ssim'] += ssim
-					#cache['psnr'] += psnr
+					cache['ssim'] += ssim
+					cache['psnr'] += psnr
 					
-					netG.load_state_dict(torch.load('cp/netG_baseline_gpu.pth'))
+					netG.load_state_dict(torch.load('cp/netG_baseline_gpu.pth', weights_only=True))
 					sr_baseline = netG(lr)
 					
 					# Avoid out of memory crash on 8G GPU
@@ -94,8 +94,8 @@ def main():
 					utils.save_image(image, out_path + 'epoch_%d_index_%d.png' % (epoch, index), padding=5)
 					index += 1
 
-				#log_value('ssim', cache['ssim']/len(val_loader), epoch)
-				#log_value('psnr', cache['psnr']/len(val_loader), epoch)
+				log_value('ssim', cache['ssim']/len(val_loader), epoch)
+				log_value('psnr', cache['psnr']/len(val_loader), epoch)
 			
 if __name__ == '__main__':
 	main()
