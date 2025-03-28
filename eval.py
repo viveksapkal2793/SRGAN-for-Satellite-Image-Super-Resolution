@@ -22,6 +22,35 @@ import pytorch_ssim
 from utils import DevDataset, to_image
 from model import Generator
 
+# Add these functions at the top of your file, after imports:
+
+def get_gpu_memory_usage():
+    """Get current GPU memory usage in MB"""
+    if not torch.cuda.is_available():
+        return 0, 0
+    
+    device = torch.cuda.current_device()
+    allocated = torch.cuda.memory_allocated(device) / (1024 * 1024)  # MB
+    reserved = torch.cuda.memory_reserved(device) / (1024 * 1024)    # MB
+    
+    return allocated, reserved
+
+def count_parameters(model):
+    """Count number of trainable parameters in the model"""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def get_model_size(model):
+    """Calculate model size in MB"""
+    param_size = 0
+    for param in model.parameters():
+        param_size += param.nelement() * param.element_size()
+    buffer_size = 0
+    for buffer in model.buffers():
+        buffer_size += buffer.nelement() * buffer.element_size()
+    
+    size_all_mb = (param_size + buffer_size) / (1024 * 1024)
+    return size_all_mb
+
 def main():
 	parser = argparse.ArgumentParser(description='Validate SRGAN')
 	parser.add_argument('--val_set', default='data/val', type=str, help='dev set path')
@@ -43,8 +72,18 @@ def main():
         
 	netG = Generator()
 
+	num_params = count_parameters(netG)
+	model_size_mb = get_model_size(netG)
+	print(f"\n===== Model Statistics =====")
+	print(f"Parameters: {num_params:,}")
+	print(f"Model Size: {model_size_mb:.2f} MB")
+	print(f"===========================\n")
+
 	if torch.cuda.is_available():
 		netG.cuda()
+		print(f"GPU: {torch.cuda.get_device_name(0)}")
+		allocated, reserved = get_gpu_memory_usage()
+		print(f"Initial GPU Memory: {allocated:.2f} MB (allocated), {reserved:.2f} MB (reserved)")
 	
 	out_path = 'vis/'
 	if not os.path.exists(out_path):
@@ -55,8 +94,11 @@ def main():
 			with torch.no_grad():
 				netG.eval()
 
+				if torch.cuda.is_available():
+					torch.cuda.reset_peak_memory_stats()
+
 				val_bar = tqdm(val_loader)
-				cache = {'ssim': 0, 'psnr': 0, 'inference_times': []}
+				cache = {'ssim': 0, 'psnr': 0, 'inference_times': [], 'gpu_mem': []}
 				dev_images = []
 				for val_lr, val_hr_restore, val_hr in val_bar:
 					batch_size = val_lr.size(0)
@@ -77,6 +119,11 @@ def main():
 					end_time = time.time()
 					inference_time = end_time - start_time
 					cache['inference_times'].append(inference_time)
+
+					# Track GPU memory
+					if torch.cuda.is_available():
+						allocated, reserved = get_gpu_memory_usage()
+						cache['gpu_mem'].append((allocated, reserved))
 
 					psnr = 10 * log10(1 / ((sr - hr) ** 2).mean().item())
 					ssim = pytorch_ssim.ssim(sr, hr).item()
@@ -103,6 +150,17 @@ def main():
 				avg_time = sum(cache['inference_times']) / len(cache['inference_times'])
 				print(f"\nAverage inference time per image: {avg_time:.4f} seconds")
 				print(f"FPS: {1.0/avg_time:.2f}")
+
+				# Print GPU memory statistics
+				if torch.cuda.is_available():
+					peak_allocated = torch.cuda.max_memory_allocated() / (1024 * 1024)
+					peak_reserved = torch.cuda.max_memory_reserved() / (1024 * 1024)
+
+					avg_allocated = sum(m[0] for m in cache['gpu_mem']) / len(cache['gpu_mem'])
+					avg_reserved = sum(m[1] for m in cache['gpu_mem']) / len(cache['gpu_mem'])
+
+					print(f"GPU Memory (average): {avg_allocated:.2f} MB (allocated), {avg_reserved:.2f} MB (reserved)")
+					print(f"GPU Memory (peak): {peak_allocated:.2f} MB (allocated), {peak_reserved:.2f} MB (reserved)")
 
 				dev_images = torch.stack(dev_images)
 				dev_images = torch.chunk(dev_images, dev_images.size(0) // 4)
