@@ -128,14 +128,14 @@ Evaluation results include:
 
 Below are some example results from the SRGAN model compared to bicubic interpolation:
 
-![Urban Area Comparison](sr_results/epoch_1000_index_1.png)
-*Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
+![Urban Area Comparison](sr_results/epoch_1000_index_1.png)\\
+*1: Bicubic upsampling | 2: Ground truth | 3: SRGAN output (our model) | 4: Baseline Model*
 
-![Rural Comparison](sr_results/epoch_1000_index_2.png)
-*Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
+![Rural Comparison](sr_results/epoch_1000_index_2.png)\\
+*1: Bicubic upsampling | 2: Ground truth | 3: SRGAN output (our model) | 4: Baseline Model*
 
-![Details Comparison](sr_results/epoch_1000_index_3.png)
-*Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
+![Details Comparison](sr_results/epoch_1000_index_3.png)\\
+*1: Bicubic upsampling | 2: Ground truth | 3: SRGAN output (our model) | 4: Baseline Model*
 
 The SRGAN model (right image) produces sharper details and more defined edges compared to standard bicubic upsampling (left image), resulting in super-resolved images that more closely match the ground truth (middle image).
 
