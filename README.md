@@ -130,17 +130,17 @@ Below are some example results from the SRGAN model compared to bicubic interpol
 
 ### Example 1: Urban Area
 
-![Urban Area Comparison](vis/epoch_1000_index_1.png)
+![Urban Area Comparison](sr_results/epoch_1000_index_1.png)
 *Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
 
 ### Example 2: Rural Landscape
 
-![Rural Comparison](vis/epoch_1000_index_2.png)
+![Rural Comparison](sr_results/epoch_1000_index_2.png)
 *Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
 
 ### Example 3: Detailed Features
 
-![Details Comparison](vis/epoch_1000_index_3.png)
+![Details Comparison](sr_results/epoch_1000_index_3.png)
 *Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
 
 The SRGAN model (right image) produces sharper details and more defined edges compared to standard bicubic upsampling (left image), resulting in super-resolved images that more closely match the ground truth (middle image).
