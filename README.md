@@ -128,17 +128,11 @@ Evaluation results include:
 
 Below are some example results from the SRGAN model compared to bicubic interpolation:
 
-### Example 1: Urban Area
-
 ![Urban Area Comparison](sr_results/epoch_1000_index_1.png)
 *Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
 
-### Example 2: Rural Landscape
-
 ![Rural Comparison](sr_results/epoch_1000_index_2.png)
 *Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
-
-### Example 3: Detailed Features
 
 ![Details Comparison](sr_results/epoch_1000_index_3.png)
 *Left: Bicubic upsampling | Middle: Ground truth | Right: SRGAN output*
