@@ -146,8 +146,8 @@ The SRGAN model (right image) produces sharper details and more defined edges co
 
 | Method | PSNR (dB) | SSIM | Inference Time (s) |
 |--------|-----------|------|-------------------|
-| Bicubic | ~28.5 | ~0.82 | - |
-| SRGAN (ours) | ~31.0 | ~0.88 | ~0.0173 |
+| Bicubic | ~28.31 | ~0.8057 | - |
+| SRGAN (ours) | ~31.014 | ~0.8829 | ~0.0173 |
 
 ## License
 
