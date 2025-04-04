@@ -7,6 +7,7 @@ from PIL import Image
 from torch.autograd import Variable
 from torchvision.transforms import ToTensor, ToPILImage
 from model import Generator
+import numpy as np
 
 # Set page configuration
 st.set_page_config(
@@ -45,6 +46,34 @@ def process_image(image, model, device):
     sr_image = ToPILImage()(output[0].data.cpu())
     
     return sr_image, inference_time
+
+# Fixed function to extract a zoomed crop from an image
+def get_zoomed_crop(image, center_x, center_y, crop_size, zoom_factor=2):
+    """Extract a region around center_x, center_y and zoom it"""
+    # Calculate crop boundaries
+    half_size = crop_size // 2
+    left = max(0, center_x - half_size)
+    top = max(0, center_y - half_size)
+    right = min(image.width, center_x + half_size)
+    bottom = min(image.height, center_y + half_size)
+    
+    # Ensure valid crop coordinates
+    if right <= left:
+        right = left + 1
+    if bottom <= top:
+        bottom = top + 1
+    
+    # Crop and zoom
+    cropped = image.crop((left, top, right, bottom))
+    
+    # Only resize if not already at original size
+    if crop_size < image.width or crop_size < image.height:
+        # Make it larger to see details better
+        zoomed = cropped.resize((int(cropped.width * zoom_factor), 
+                                int(cropped.height * zoom_factor)), 
+                               Image.LANCZOS)
+        return zoomed
+    return cropped
 
 # Main application UI
 st.title("🛰️ Satellite Image Super-Resolution")
@@ -101,6 +130,49 @@ if uploaded_file is not None:
         width, height = sr_image.size
         st.write(f"Dimensions: {width}×{height}")
         st.write(f"Processing time: {inference_time:.3f}s")
+    
+    # Add zoom controls
+    st.subheader("Compare Details (Zoom View)")
+    
+    # Add zoom controls to sidebar
+    st.sidebar.header("Zoom Controls")
+    
+    # Default to center of image
+    default_x = width // 2
+    default_y = height // 2
+    
+    # Determine max crop size (20% of image width by default)
+    default_crop_size = min(width, height) // 5
+    max_crop_size = min(width, height) // 2
+    
+    # Add sliders to control zoom position and size
+    zoom_col1, zoom_col2 = st.sidebar.columns(2)
+    with zoom_col1:
+        center_x = st.slider("X position", 0, width, default_x)
+    with zoom_col2:
+        center_y = st.slider("Y position", 0, height, default_y)
+    
+    crop_size = st.sidebar.slider("Crop size", 2, max_crop_size, default_crop_size)
+    zoom_factor = st.sidebar.slider("Zoom factor", 1, 5, 2)
+    
+    # Get zoomed crops
+    original_crop = get_zoomed_crop(image, center_x, center_y, crop_size, zoom_factor)
+    sr_crop = get_zoomed_crop(sr_image, center_x, center_y, crop_size, zoom_factor)
+    
+    # Display zoomed crops
+    zoom_col1, zoom_col2 = st.columns(2)
+    with zoom_col1:
+        st.write("**Original (Zoomed)**")
+        st.image(original_crop, use_column_width=True)
+    
+    with zoom_col2:
+        st.write("**SRGAN (Zoomed)**")
+        st.image(sr_crop, use_column_width=True)
+        
+    # Add "crosshair" indicator on main images
+    st.write("""
+    *The zoom region is centered at ({}, {}) with size {}×{} pixels*
+    """.format(center_x, center_y, crop_size, crop_size))
     
     # Add download button
     buf = io.BytesIO()
