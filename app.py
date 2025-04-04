@@ -2,13 +2,11 @@ import io
 import streamlit as st
 import torch
 import time
-import numpy as np
 import os
 from PIL import Image
 from torch.autograd import Variable
-from torchvision.transforms import ToTensor, ToPILImage, CenterCrop, Resize
+from torchvision.transforms import ToTensor, ToPILImage
 from model import Generator
-from math import log10
 
 # Set page configuration
 st.set_page_config(
@@ -16,17 +14,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Calculate valid crop size (from utils.py)
-def calculate_valid_crop_size(crop_size, upscale_factor):
-    return crop_size - (crop_size % upscale_factor)
-
-# Function to calculate PSNR
-def calculate_psnr(img1, img2):
-    mse = ((img1 - img2) ** 2).mean()
-    if mse == 0:
-        return 100
-    return 10 * log10(1.0 / mse)
 
 # Load model with caching
 @st.cache_resource
@@ -37,20 +24,14 @@ def load_model(model_path):
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.load_state_dict(torch.load(model_path, 
-                                      map_location=device,
-                                      weights_only=True))
+                                     map_location=device,
+                                     weights_only=True))
     return model, device
 
-# Function for processing the image
-def process_image(image, model, device, use_center_crop=True, crop_size=128, upscale_factor=4):
-    # Apply proper preprocessing
-    if use_center_crop:
-        crop_size = calculate_valid_crop_size(crop_size, upscale_factor)
-        hr_transform = CenterCrop(crop_size)
-        image = hr_transform(image)
-    
-    # Convert to tensor and prepare for model
-    img_tensor = ToTensor()(image).unsqueeze(0)
+# Function for processing the image - simplified to match sr.py
+def process_image(image, model, device):
+    # Convert to tensor and prepare for model (matching sr.py)
+    img_tensor = Variable(ToTensor()(image)).unsqueeze(0)
     img_tensor = img_tensor.to(device)
     
     # Generate super-resolution image
@@ -60,31 +41,18 @@ def process_image(image, model, device, use_center_crop=True, crop_size=128, ups
         torch.cuda.synchronize() if torch.cuda.is_available() else None
         inference_time = time.time() - start_time
 
-    # Convert back to PIL Image
+    # Convert back to PIL Image (matching sr.py)
     sr_image = ToPILImage()(output[0].data.cpu())
     
-    # Create bicubic upscaled version for comparison
-    if use_center_crop:
-        lr_scale = Resize(crop_size // upscale_factor, interpolation=Image.BICUBIC)
-        hr_scale = Resize(crop_size, interpolation=Image.BICUBIC)
-        lr_image = lr_scale(image)
-        bicubic_image = hr_scale(lr_image)
-    else:
-        # Simple 4x bicubic upscaling
-        w, h = image.size
-        lr_image = image.resize((w//upscale_factor, h//upscale_factor), Image.BICUBIC)
-        bicubic_image = lr_image.resize((w, h), Image.BICUBIC)
-    
-    return sr_image, bicubic_image, lr_image, inference_time
+    return sr_image, inference_time
 
 # Main application UI
 st.title("🛰️ Satellite Image Super-Resolution")
 st.write("""
-Upload a satellite image and enhance its resolution using SRGAN (Super-Resolution GAN).
-This application uses a deep learning model specifically trained for satellite imagery.
+Upload a satellite image and enhance its resolution using SRGAN.
 """)
 
-# Sidebar for options
+# Sidebar for model selection
 st.sidebar.header("Model Options")
 model_option = st.sidebar.selectbox(
     "Select model",
@@ -92,11 +60,6 @@ model_option = st.sidebar.selectbox(
 )
 
 model_path = 'cp/netG_epoch_1000_gpu.pth' if model_option == "1000-epoch model" else 'cp/netG_baseline_gpu.pth'
-
-preprocessing_option = st.sidebar.checkbox("Use center cropping", value=True,
-                                        help="Crops image from center before processing")
-crop_size = st.sidebar.slider("Crop size", 96, 256, 128, 
-                             help="Size of the center crop (if enabled)")
                         
 # Display model info
 st.sidebar.header("Model Information")
@@ -119,33 +82,25 @@ if uploaded_file is not None:
     image = Image.open(uploaded_file).convert('RGB')
     
     # Create columns for display
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
         st.write("**Original Image**")
         st.image(image, use_column_width=True)
         width, height = image.size
-        st.write(f"Dimensions: {width}x{height}")
+        st.write(f"Dimensions: {width}×{height}")
     
-    # Process the image
+    # Process the image - simplified to match sr.py
     with st.spinner("Generating super-resolution image..."):
-        sr_image, bicubic_image, lr_image, inference_time = process_image(
-            image, model, device, preprocessing_option, crop_size, 4
-        )
+        sr_image, inference_time = process_image(image, model, device)
     
     # Display results
     with col2:
-        st.write("**Bicubic Upsampling**")
-        st.image(bicubic_image, use_column_width=True)
-        st.write(f"Simple interpolation")
-    
-    with col3:
         st.write("**SRGAN Output**")
         st.image(sr_image, use_column_width=True)
+        width, height = sr_image.size
+        st.write(f"Dimensions: {width}×{height}")
         st.write(f"Processing time: {inference_time:.3f}s")
-    
-    # Comparison and metrics
-    st.subheader("Visual Comparison")
     
     # Add download button
     buf = io.BytesIO()
@@ -160,10 +115,8 @@ if uploaded_file is not None:
     )
     
     # Additional information about the model
-    st.subheader("About this model")
     st.write("""
     This SRGAN model was specifically trained for satellite imagery super-resolution with a 4× upscaling factor.
-    The model uses a deep residual network with skip connections to generate high-resolution details.
     """)
 
 # Footer
